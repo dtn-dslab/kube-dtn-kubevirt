@@ -327,6 +327,10 @@ func main() {
 		errChan <- kubedtnServer.Serve()
 	}()
 
+	go func() {
+		// errChan <- kubedtnServer.DHCPServe()
+	}()
+
 	select {
 	case s := <-signalStopChan:
 		log.Log.Infof("sidecar-shim received signal: %s", s.String())

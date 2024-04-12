@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -o onUndefineDomain ./sidecar
 #-------------------Run Stage-------------------
 FROM alpine:3.19
 
-RUN apk add --no-cache iproute2 sudo bash libvirt-client
+RUN apk add --no-cache iproute2 sudo bash libvirt-client tcpdump
 
 # Install Open vSwitch and Supervisor
 RUN apk add --no-cache openvswitch supervisor

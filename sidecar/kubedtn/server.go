@@ -11,6 +11,8 @@ import (
 	common "github.com/dtn-dslab/kube-dtn-sidecar/common"
 	pb "github.com/dtn-dslab/kube-dtn-sidecar/proto/v1"
 	"github.com/go-redis/redis/v8"
+	dhcp "github.com/krolaw/dhcp4"
+	dhcpconn "github.com/krolaw/dhcp4/conn"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"kubevirt.io/client-go/log"
@@ -23,8 +25,29 @@ type KubeDTN struct {
 	redisClient  *redis.Client
 	ctx          context.Context
 	ovsClient    *ovs.Client
+	dhcpServer   *common.DHCPServer
 	name         string
 	vmInterfaces map[string]common.VMInterface
+}
+
+func (m *KubeDTN) DHCPServe() error {
+	if err := common.MakeVeth(m.dhcpServer.DhcpInterface, m.dhcpServer.DhcpBridgeInterface); err != nil {
+		return err
+	}
+
+	if err := common.AddInterfaceToDefaultBridge(m.ovsClient, m.dhcpServer.DhcpBridgeInterface.IntfName); err != nil {
+		return err
+	}
+
+	if err := common.AddDHCPFlowFromPortToDefaultBridge(m.ovsClient, m.dhcpServer.DhcpBridgeInterface.IntfName); err != nil {
+		return err
+	}
+
+	conn, err := dhcpconn.NewUDP4BoundListener(m.dhcpServer.DhcpInterface.IntfName, ":67")
+	if err != nil {
+		return err
+	}
+	return dhcp.Serve(conn, m.dhcpServer.DhcpHandler)
 }
 
 type Config struct {
@@ -50,8 +73,27 @@ func New(cfg Config) (*KubeDTN, error) {
 		return nil, fmt.Errorf("failed to create default OVS bridge: %s", err)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to libvirt: %s", err)
+	serverIP := net.IP{172, 30, 0, 1}
+	dhcpHandler := &common.DHCPHandler{
+		Ip:      serverIP,
+		Leases:  make([]common.Lease, 10),
+		Options: dhcp.Options{
+			// dhcp.OptionSubnetMask:       []byte{255, 255, 240, 0},
+			// dhcp.OptionRouter:           []byte(serverIP), // Presuming Server is also your router
+			// dhcp.OptionDomainNameServer: []byte(serverIP), // Presuming Server is also your DNS server
+		},
+	}
+
+	dhcpServer := &common.DHCPServer{
+		DhcpHandler: dhcpHandler,
+		DhcpInterface: common.NetworkInterface{
+			IntfName: common.DhcpInterfaceDefaultName,
+			Mac:      common.RandomMac(),
+		},
+		DhcpBridgeInterface: common.NetworkInterface{
+			IntfName: common.DhcpBrInterfaceDefaultName,
+			Mac:      common.RandomMac(),
+		},
 	}
 
 	m := &KubeDTN{
@@ -60,6 +102,7 @@ func New(cfg Config) (*KubeDTN, error) {
 		ctx:          ctx,
 		redisClient:  redisClient,
 		ovsClient:    ovsClient,
+		dhcpServer:   dhcpServer,
 		name:         hostname,
 		vmInterfaces: make(map[string]common.VMInterface),
 	}
@@ -78,9 +121,12 @@ func (m *KubeDTN) AddLink(link common.Link) error {
 		},
 		VirtInterface: common.NetworkInterface{
 			IntfName: link.LocalIntf,
-			Mac:      common.RandomMac(),
+			Mac:      link.LocalMAC,
 		},
 	}
+
+	newVmInterface.CNIInterface.LocalMAC = common.RandomMac()
+	common.SetInterfaceMac(link.LocalIntf, newVmInterface.CNIInterface.LocalMAC)
 
 	if err := common.AddInterfaceToDefaultBridge(m.ovsClient, link.LocalIntf); err != nil {
 		return err
@@ -124,6 +170,9 @@ func (m *KubeDTN) AddLink(link common.Link) error {
 	common.RemoveInterfaceAddress(link.LocalIntf)
 
 	m.vmInterfaces[link.LocalIntf] = newVmInterface
+	// if err := m.dhcpServer.AddLease(link); err != nil {
+	// 	log.Log.Warningf("Failed to add lease")
+	// }
 
 	return nil
 }
@@ -168,6 +217,18 @@ func (m *KubeDTN) SetupStatus() error {
 	return nil
 }
 
+func (m *KubeDTN) Destroy() error {
+	m.ovsClient.VSwitch.DeleteBridge(common.DefaultBridgeName)
+	for _, vmInterface := range m.vmInterfaces {
+		common.DeleteNetworkInterface(vmInterface.TapInterface.IntfName)
+	}
+
+	common.DeleteNetworkInterface(m.dhcpServer.DhcpInterface.IntfName)
+	common.DeleteNetworkInterface(m.dhcpServer.DhcpBridgeInterface.IntfName)
+
+	return nil
+}
+
 func (m *KubeDTN) Serve() error {
 	if err := m.InitStatus(); err != nil {
 		return err
@@ -182,4 +243,5 @@ func (m *KubeDTN) Serve() error {
 
 func (m *KubeDTN) GracefulStop() {
 	m.s.GracefulStop()
+	m.Destroy()
 }

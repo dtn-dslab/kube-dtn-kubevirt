@@ -79,6 +79,7 @@ func AddFlowToBridge(c *ovs.Client, bridgeName string, vmInterface VMInterface) 
 	flowToTap := ovs.Flow{
 		InPort: cniPortID,
 		Actions: []ovs.Action{
+			// ovs.SetField(vmInterface.VirtInterface.Mac, "eth_dst"),
 			ovs.Output(tapPortID),
 		},
 	}
@@ -86,7 +87,7 @@ func AddFlowToBridge(c *ovs.Client, bridgeName string, vmInterface VMInterface) 
 	flowToCNI := ovs.Flow{
 		InPort: tapPortID,
 		Actions: []ovs.Action{
-			ovs.SetField(vmInterface.CNIInterface.LocalMAC, "eth_src"),
+			// ovs.SetField(vmInterface.CNIInterface.LocalMAC, "eth_src"),
 			ovs.Output(cniPortID),
 		},
 	}
@@ -104,6 +105,49 @@ func AddFlowToBridge(c *ovs.Client, bridgeName string, vmInterface VMInterface) 
 
 func AddFlowToDefaultBridge(c *ovs.Client, vmInterface VMInterface) error {
 	if err := AddFlowToBridge(c, DefaultBridgeName, vmInterface); err != nil {
+		return err
+	}
+	return nil
+}
+
+func AddDHCPFlowFromPortToBridge(c *ovs.Client, bridgeName, portName string) error {
+	portID, err := GetPortID(bridgeName, portName)
+	if err != nil {
+		return err
+	}
+
+	flow := ovs.Flow{
+		InPort: portID,
+		Actions: []ovs.Action{
+			ovs.Normal(),
+		},
+	}
+
+	flow1 := ovs.Flow{
+		Matches: []ovs.Match{
+			ovs.DataLinkType(0x0800),
+			ovs.NetworkProtocol(17),
+			ovs.TransportSourcePort(68),
+			ovs.TransportDestinationPort(67),
+		},
+		Actions: []ovs.Action{
+			ovs.Output(portID),
+		},
+	}
+
+	if err := c.OpenFlow.AddFlow(bridgeName, &flow); err != nil {
+		return err
+	}
+
+	if err := c.OpenFlow.AddFlow(bridgeName, &flow1); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func AddDHCPFlowFromPortToDefaultBridge(c *ovs.Client, portName string) error {
+	if err := AddDHCPFlowFromPortToBridge(c, DefaultBridgeName, portName); err != nil {
 		return err
 	}
 	return nil

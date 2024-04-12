@@ -43,6 +43,20 @@ func IsInterfaceExist(name string) bool {
 	return err == nil
 }
 
+func SetInterfaceMac(name, mac string) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return err
+	}
+
+	hwAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		return err
+	}
+
+	return netlink.LinkSetHardwareAddr(link, hwAddr)
+}
+
 func RemoveInterfaceAddress(name string) error {
 	link, err := netlink.LinkByName(name)
 	if err != nil {
@@ -58,6 +72,17 @@ func RemoveInterfaceAddress(name string) error {
 			// return err
 		}
 	}
+
+	return nil
+}
+
+func DeleteNetworkInterface(name string) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return nil
+	}
+
+	netlink.LinkDel(link)
 
 	return nil
 }

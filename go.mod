@@ -15,6 +15,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/digitalocean/go-openvswitch v0.0.0-20240130171624-c0f7d42efe24 // indirect
+	github.com/krolaw/dhcp4 v0.0.0-20190909130307-a50d88189771 // indirect
 	github.com/libvirt/libvirt-go v7.4.0+incompatible // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	golang.org/x/crypto v0.21.0 // indirect
