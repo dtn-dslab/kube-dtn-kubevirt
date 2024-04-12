@@ -26,17 +26,17 @@ func RandomMac() string {
 func AddTapInterface(linkName, mac string) error {
 	cmd := exec.Command("sudo", "ip", "tuntap", "add", "mode", "tap", linkName)
 	if err := cmd.Run(); err != nil {
-		// return fmt.Errorf("failed to add a new tap interface: %s", err)
+		return fmt.Errorf("failed to add a new tap interface: %s", err)
 	}
 
 	cmd = exec.Command("sudo", "ip", "link", "set", "dev", linkName, "address", mac)
 	if err := cmd.Run(); err != nil {
-		// return fmt.Errorf("failed to set mac on tap interface: %s", err)
+		return fmt.Errorf("failed to set mac on tap interface: %s", err)
 	}
 
 	cmd = exec.Command("sudo", "ip", "link", "set", linkName, "up")
 	if err := cmd.Run(); err != nil {
-		// return fmt.Errorf("failed to set tap interface up: %s", err)
+		return fmt.Errorf("failed to set tap interface up: %s", err)
 	}
 
 	return nil

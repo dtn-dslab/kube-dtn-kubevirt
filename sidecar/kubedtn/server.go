@@ -13,16 +13,18 @@ import (
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"kubevirt.io/client-go/log"
 )
 
 type KubeDTN struct {
 	pb.UnimplementedVMSidecarServer
-	s           *grpc.Server
-	lis         net.Listener
-	redisClient *redis.Client
-	ctx         context.Context
-	ovsClient   *ovs.Client
-	name        string
+	s            *grpc.Server
+	lis          net.Listener
+	redisClient  *redis.Client
+	ctx          context.Context
+	ovsClient    *ovs.Client
+	name         string
+	vmInterfaces map[string]common.VMInterface
 }
 
 type Config struct {
@@ -44,17 +46,22 @@ func New(cfg Config) (*KubeDTN, error) {
 	redisClient := common.GenerateRedisClient()
 
 	ovsClient := ovs.New()
-	// if err := common.CreateDefaultOVSBridge(ovsClient); err != nil {
-	// 	return nil, fmt.Errorf("failed to create default OVS bridge: %s", err)
-	// }
+	if err := common.CreateDefaultOVSBridge(ovsClient); err != nil {
+		return nil, fmt.Errorf("failed to create default OVS bridge: %s", err)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to libvirt: %s", err)
+	}
 
 	m := &KubeDTN{
-		s:           grpc.NewServer(cfg.GRPCOpts...),
-		lis:         lis,
-		ctx:         ctx,
-		redisClient: redisClient,
-		ovsClient:   ovsClient,
-		name:        hostname,
+		s:            grpc.NewServer(cfg.GRPCOpts...),
+		lis:          lis,
+		ctx:          ctx,
+		redisClient:  redisClient,
+		ovsClient:    ovsClient,
+		name:         hostname,
+		vmInterfaces: make(map[string]common.VMInterface),
 	}
 
 	pb.RegisterVMSidecarServer(m.s, m)
@@ -62,7 +69,77 @@ func New(cfg Config) (*KubeDTN, error) {
 	return m, nil
 }
 
+func (m *KubeDTN) AddLink(link common.Link) error {
+	newVmInterface := common.VMInterface{
+		CNIInterface: link,
+		TapInterface: common.NetworkInterface{
+			IntfName: "tap" + link.LocalIntf,
+			Mac:      common.RandomMac(),
+		},
+		VirtInterface: common.NetworkInterface{
+			IntfName: link.LocalIntf,
+			Mac:      common.RandomMac(),
+		},
+	}
+
+	if err := common.AddInterfaceToDefaultBridge(m.ovsClient, link.LocalIntf); err != nil {
+		return err
+	}
+
+	log.Log.Infof("Added CNI interface to bridge: %s", link.LocalIntf)
+
+	// Create Tap and add it to the bridge
+	if err := common.AddTapInterface(newVmInterface.TapInterface.IntfName, newVmInterface.TapInterface.Mac); err != nil {
+		common.DeleteInterfaceFromDefaultBridge(m.ovsClient, link.LocalIntf)
+		return err
+	}
+
+	log.Log.Infof("Added tap interface: %s", newVmInterface.TapInterface.IntfName)
+
+	if err := common.AddInterfaceToDefaultBridge(m.ovsClient, newVmInterface.TapInterface.IntfName); err != nil {
+		common.DeleteInterfaceFromDefaultBridge(m.ovsClient, link.LocalIntf)
+		return err
+	}
+
+	log.Log.Infof("Added tap interface to bridge: %s", newVmInterface.TapInterface.IntfName)
+
+	libvirtClient, err := common.ConnectLibvirtBlock()
+	if err != nil {
+		return err
+	}
+
+	if err := common.AttachDeviceByLinkBlock(libvirtClient, newVmInterface); err != nil {
+		return err
+	}
+
+	log.Log.Infof("Attached device to libvirt: %s", newVmInterface.VirtInterface.IntfName)
+
+	if err := common.AddFlowToDefaultBridge(m.ovsClient, newVmInterface); err != nil {
+		return err
+	}
+
+	log.Log.Infof("Added flow rules: %s", newVmInterface.VirtInterface.IntfName)
+
+	// Remove IP address from the CNI interface
+	common.RemoveInterfaceAddress(link.LocalIntf)
+
+	m.vmInterfaces[link.LocalIntf] = newVmInterface
+
+	return nil
+}
+
 func (m *KubeDTN) InitStatus() error {
+	topoSpec, err := common.GetTopoSpecFromRedis(m.ctx, m.redisClient, m.name)
+	if err != nil {
+		return err
+	}
+	for _, link := range topoSpec.Links {
+		if !common.IsInterfaceExist(link.LocalIntf) {
+			continue
+		}
+
+		m.AddLink(link)
+	}
 
 	return nil
 }

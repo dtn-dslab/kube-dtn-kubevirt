@@ -153,3 +153,14 @@ type RedisTopologyStatus struct {
 	PodType string `json:"type"`
 	PodIP   string `json:"pod_ip"`
 }
+
+type NetworkInterface struct {
+	IntfName string
+	Mac      string
+}
+
+type VMInterface struct {
+	CNIInterface  Link
+	TapInterface  NetworkInterface
+	VirtInterface NetworkInterface
+}

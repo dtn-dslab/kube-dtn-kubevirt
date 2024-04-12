@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 	"net"
+
+	"github.com/vishvananda/netlink"
 )
 
 func Map[T, U any](ts []T, f func(T) U) []U {
@@ -34,4 +36,28 @@ func GetMainInterfaceAddress() (string, error) {
 	}
 
 	return mainInterfaceAddr.String(), nil
+}
+
+func IsInterfaceExist(name string) bool {
+	_, err := net.InterfaceByName(name)
+	return err == nil
+}
+
+func RemoveInterfaceAddress(name string) error {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		return err
+	}
+	addrList, err := netlink.AddrList(link, netlink.FAMILY_V4)
+	if err != nil {
+		return err
+	}
+
+	for _, addr := range addrList {
+		if err := netlink.AddrDel(link, &addr); err != nil {
+			// return err
+		}
+	}
+
+	return nil
 }
