@@ -1,6 +1,9 @@
 #-------------------Build Stage (sidecar)-------------------
 
-FROM golang:1.21.6 AS build_base
+FROM golang:1.22.3 AS build_base
+
+ENV GO111MODULE=on
+ENV GOPROXY=https://goproxy.cn,direct
 
 WORKDIR /go/src/github.com/kubevirt/sidecar-shim
 
@@ -26,10 +29,6 @@ ADD supervisord.conf /etc/supervisord.conf
 
 COPY --from=build_base /go/src/github.com/kubevirt/sidecar-shim/sidecar_shim /sidecar-shim
 COPY --from=build_base /go/src/github.com/kubevirt/sidecar-shim/onUndefineDomain /usr/local/bin/onDefineDomain
-
-ENV REDIS_ADDR service-kubedtn-redis.kubedtn.svc.dev.dslab:6379
-ENV REDIS_PASSWORD reins5401
-ENV REDIS_DB 0
 
 ADD entrypoint.sh /entrypoint.sh
 

@@ -1,0 +1,119 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-1
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: vm-1
+      annotations:
+        hooks.kubevirt.io/hookSidecars: '[{"args": ["--version", "v1alpha2"], "image":
+      "harbor.sail.se.sjtu.edu.cn/kubedtn/kubedtn-sidecar:main-c07ffd7-8"}]'
+    spec:
+      architecture: amd64
+      domain:
+        cpu:
+          cores: 4
+        devices:
+          disks:
+            - name: ubuntu
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          # interfaces:
+          #   - name: default
+          #     masquerade: {}
+        resources:
+          requests:
+            memory: 32G
+        machine:
+          type: q35
+      # networks:
+      #   - name: default
+      #     pod: {}
+      volumes:
+        - name: ubuntu
+          persistentVolumeClaim:
+            claimName: ubuntu2204-test
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              ssh_pwauth: True
+              chpasswd:
+                list: | 
+                  root:reins5401
+                  ubuntu:reins5401
+                expire: False
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vm-2
+spec:
+  containers:
+    - image: harbor.sail.se.sjtu.edu.cn/kubedtn/alpine-test:v6
+      name: pod
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vm-3
+spec:
+  nodeName: node5
+  containers:
+    - image: harbor.sail.se.sjtu.edu.cn/kubedtn/alpine-test:v6
+      name: pod
+---
+apiVersion: kubedtn.dslab.sjtu/v1
+kind: NetworkNode
+metadata:
+  name: vm-1
+spec:
+  network_intfs:
+    - uid: 1
+      name: eth1
+      mac: 00:00:00:00:01:01
+      ipv4: 12.12.12.1/24
+      ipv6: 2001:db8::1/64
+    - uid: 2
+      name: eth2
+      mac: 00:00:00:00:01:02
+      ipv4: 13.13.13.1/24
+---
+apiVersion: kubedtn.dslab.sjtu/v1
+kind: NetworkNode
+metadata:
+  name: vm-2
+spec:
+  network_intfs:
+    - uid: 3
+      name: eth1
+      mac: 00:00:00:00:02:01
+      ipv4: 12.12.12.2/24
+    - uid: 4
+      name: eth2
+      mac: 00:00:00:00:02:02
+      ipv4: 23.23.23.2/24
+---
+apiVersion: kubedtn.dslab.sjtu/v1
+kind: NetworkNode
+metadata:
+  name: vm-3
+spec:
+  network_intfs:
+    - uid: 5
+      name: eth1
+      mac: 00:00:00:00:03:01
+      ipv4: 13.13.13.3/24
+    - uid: 6
+      name: eth2
+      mac: 00:00:00:00:03:02
+      ipv4: 23.23.23.3/24
+    - uid: 7
+      name: eth3
+      mac: 00:00:00:00:03:03

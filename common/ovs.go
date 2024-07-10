@@ -67,7 +67,7 @@ func DeleteInterfaceFromDefaultBridge(c *ovs.Client, ifaceName string) error {
 }
 
 func AddFlowToBridge(c *ovs.Client, bridgeName string, vmInterface VMInterface) error {
-	cniPortID, err := GetPortID(bridgeName, vmInterface.CNIInterface.LocalIntf)
+	cniPortID, err := GetPortID(bridgeName, vmInterface.CNIInterface.IntfName)
 	if err != nil {
 		return err
 	}
@@ -76,27 +76,31 @@ func AddFlowToBridge(c *ovs.Client, bridgeName string, vmInterface VMInterface) 
 		return err
 	}
 
-	flowToTap := ovs.Flow{
+	flows := []ovs.Flow{}
+
+	flows = append(flows, ovs.Flow{
 		InPort: cniPortID,
 		Actions: []ovs.Action{
 			// ovs.SetField(vmInterface.VirtInterface.Mac, "eth_dst"),
 			ovs.Output(tapPortID),
 		},
-	}
+	})
 
-	flowToCNI := ovs.Flow{
+	flows = append(flows, ovs.Flow{
 		InPort: tapPortID,
 		Actions: []ovs.Action{
 			// ovs.SetField(vmInterface.CNIInterface.LocalMAC, "eth_src"),
 			ovs.Output(cniPortID),
 		},
-	}
+	})
 
-	if err := c.OpenFlow.AddFlow(bridgeName, &flowToTap); err != nil {
-		return err
-	}
-
-	if err := c.OpenFlow.AddFlow(bridgeName, &flowToCNI); err != nil {
+	if err := c.OpenFlow.AddFlowBundle(bridgeName, func(tx *ovs.FlowTransaction) error {
+		for _, flow := range flows {
+			tx.Add(&flow)
+		}
+		tx.Commit()
+		return nil
+	}); err != nil {
 		return err
 	}
 

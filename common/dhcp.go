@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"dslab.sjtu/kube-dtn/api/v1/pb"
 	dhcp "github.com/krolaw/dhcp4"
 )
 
@@ -33,14 +34,14 @@ type DHCPServer struct {
 	DhcpBridgeInterface NetworkInterface
 }
 
-func (h *DHCPServer) AddLease(link Link) error {
-	netIP := net.ParseIP(link.LocalIP)
+func (h *DHCPServer) AddLease(intf *pb.NetworkIntf) error {
+	netIP := net.ParseIP(intf.Ipv4)
 	if netIP != nil {
 		return fmt.Errorf("failed to parse IP from lease")
 	}
 
 	lease := Lease{
-		HwAddr: link.LocalMAC,
+		HwAddr: intf.Mac,
 		IPAddr: netIP,
 	}
 

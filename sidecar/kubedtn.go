@@ -28,44 +28,6 @@ func onDefineDomain(vmiJSON, domainXML []byte) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal given Domain spec: %s %s", err, string(domainXML))
 	}
 
-	// logger.Println("Finished unmarshalling VMI and Domain specs...")
-	// logger.Printf("getTopoSpecFromRedis: %v", vmiSpec.ObjectMeta.Name)
-
-	// if err == nil {
-	// 	for _, link := range topoSpec.Links {
-	// 		err := addTapInterface(link.LocalIntf, link.LocalMAC)
-	// 		if err != nil {
-	// 			return "", err
-	// 		}
-
-	// 		vmMac := RandomMac()
-	// 		// generate new mac address
-
-	// 		domainSpec.Devices.Interfaces = append(domainSpec.Devices.Interfaces, api.Interface{
-	// 			Type: "ethernet",
-	// 			MAC: &api.MAC{
-	// 				MAC: vmMac,
-	// 			},
-	// 			Model: &api.Model{
-	// 				Type: "virtio-non-transitional",
-	// 			},
-	// 			MTU: &api.MTU{
-	// 				Size: "1500",
-	// 			},
-	// 			Rom: &api.Rom{
-	// 				Enabled: "no",
-	// 			},
-	// 			Target: &api.InterfaceTarget{
-	// 				Device:  link.LocalIntf,
-	// 				Managed: "no",
-	// 			},
-	// 			Alias: api.NewUserDefinedAlias(link.LocalIntf),
-	// 		})
-	// 	}
-	// }
-
-	// time.Sleep(1 * time.Second)
-
 	newDomainXML, err := xml.Marshal(domainSpec)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal new Domain spec: %s %+v", err, domainSpec)

@@ -31,8 +31,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/dtn-dslab/kube-dtn-sidecar/common"
-	"github.com/dtn-dslab/kube-dtn-sidecar/sidecar/kubedtn"
+	"dslab.sjtu/kube-dtn-sidecar/sidecar/kubedtn"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -299,10 +298,7 @@ func main() {
 	shutdownChan := make(chan struct{})
 	hooksV1alpha3.RegisterCallbacksServer(server, v1Alpha3Server{done: shutdownChan})
 
-	kubedtnServer, err := kubedtn.New(kubedtn.Config{
-		Port:     common.DefaultPort,
-		GRPCOpts: []grpc.ServerOption{},
-	})
+	kubedtnServer, err := kubedtn.New()
 	if err != nil {
 		log.Log.Reason(err).Error("Failed to create kubedtn server")
 		os.Exit(1)
@@ -324,7 +320,7 @@ func main() {
 	}()
 
 	go func() {
-		errChan <- kubedtnServer.Serve()
+		errChan <- kubedtnServer.ServeNetworkConfigure()
 	}()
 
 	go func() {

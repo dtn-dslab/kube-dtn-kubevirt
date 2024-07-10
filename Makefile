@@ -7,7 +7,7 @@ ENVTEST_K8S_VERSION = 1.25.0
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git describe --always)
-SUBVERSION := $(shell echo $$DTN_SUB)
+SUBVERSION := $(shell echo $$DTN_KV_SUB)
 TAG := $(BRANCH)-$(COMMIT)-$(SUBVERSION)
 
 ## Location to install dependencies to
@@ -31,8 +31,6 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-
-
 .PHONY: sidecar-docker
 sidecar-docker:
 	docker build . -t $(SIDECAR_IMG):$(TAG)
@@ -43,38 +41,3 @@ sidecar-push:
 
 .PHONY: sidecar-all
 sidecar-all: sidecar-docker sidecar-push
-
-.PHONY: hack
-hack:
-	docker build  -t $(HACK_IMG):$(TAG) -f ./hack/Dockerfile ./
-
-.PHONY: hack-push
-hack-push:
-	docker push $(HACK_IMG):$(TAG)
-
-.PHONY: hack-deploy
-hack-deploy: kustomize
-	cd manifests && $(KUSTOMIZE) edit set image kubedtn-hack=${HACK_IMG}:${TAG}
-	$(KUSTOMIZE) build manifests | kubectl apply -f -
-	kubectl apply -f manifests/enable-feature-gate.yaml
-	
-
-.PHONY: hack-all
-hack-all: hack hack-push hack-deploy
-
-.PHONY: protoc-gen-go
-protoc-gen-go: $(LOCALBIN)
-	test -s $(LOCALBIN)/protoc-gen-go || GOBIN=$(LOCALBIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
-
-.PHONY: protoc-gen-go-grpc
-protoc-gen-go-grpc: $(LOCALBIN)
-	test -s $(LOCALBIN)/protoc-gen-go-grpc || GOBIN=$(LOCALBIN) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
-
-.PHONY: protoc
-# apt
-protoc: 
-	sudo apt install -y protobuf-compiler
-
-.PHONY: protoc-gen-all
-protoc-gen-all: protoc-gen-go protoc-gen-go-grpc protoc ## Install all protoc-gen-* binaries.
-	protoc --go_out=paths=source_relative:. --go-grpc_out=paths=source_relative:. ./proto/v1/kube_dtn.proto
