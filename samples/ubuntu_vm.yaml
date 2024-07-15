@@ -24,17 +24,17 @@ spec:
             - name: cloudinitdisk
               disk:
                 bus: virtio
-          # interfaces:
-          #   - name: default
-          #     masquerade: {}
+          interfaces:
+            - name: default
+              masquerade: {}
         resources:
           requests:
             memory: 32G
         machine:
           type: q35
-      # networks:
-      #   - name: default
-      #     pod: {}
+      networks:
+        - name: default
+          pod: {}
       volumes:
         - name: ubuntu
           persistentVolumeClaim:

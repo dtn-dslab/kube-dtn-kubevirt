@@ -17,20 +17,16 @@ require (
 replace dslab.sjtu/kube-dtn/api => github.com/dtn-dslab/kube-dtn-api v0.0.5
 
 require (
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	golang.org/x/crypto v0.23.0 // indirect
 )
 
 require (
-	github.com/containernetworking/cni v1.1.2
 	github.com/digitalocean/go-libvirt v0.0.0-20240308204700-df736b2945cf
 	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.2.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
